@@ -24,16 +24,9 @@ namespace Interpolator
     {
         public MainWindow()
         {
-            this.Model = new PlotModel { Title = "Plot" };
+            this.Model = new PlotModel();
             this.Model.Axes.Add(this.Xaxis);
             this.Model.Axes.Add(this.Yaxis);
-            this.Model.MouseDown += (s, e) =>
-            {
-                if (e.ChangedButton == OxyMouseButton.Left)
-                {
-                    this.PlotLeftClick(s, e);
-                }
-            };
             var series = new LineSeries
             {
                 MarkerType = MarkerType.Circle,
@@ -43,18 +36,34 @@ namespace Interpolator
             series.Points.Add(new DataPoint(0, 0));
             series.Smooth = true;
             this.Model.Series.Add(series);
+            this.Model.MouseDown += (s, e) =>
+            {
+                if (e.ChangedButton == OxyMouseButton.Left)
+                {
+                    this.PlotLeftClick(s, e);
+                }
+            };
+            this.User_Points.MouseDown += (s, e) =>
+            {
+                if(e.ChangedButton == OxyMouseButton.Right)
+                {
+                    this.PlotRightClick(s, e);
+    }
+            };
         }
+
         public IPlotController plotController;
         public PlotModel Model { get; set; }
         public LinearAxis Xaxis = new LinearAxis
         {
-            Position = AxisPosition.Bottom, Maximum = 10, AbsoluteMaximum = 10, AbsoluteMinimum = -10, Title = "X", IsZoomEnabled = false
+            Position = AxisPosition.Bottom, Minimum = 0, Maximum = 10, MaximumRange = 10, IsPanEnabled = false,
+            MinimumRange = -10, Title = "X"
         };
         public LinearAxis Yaxis = new LinearAxis
         {
-            Position = AxisPosition.Top, Maximum = 10, AbsoluteMinimum = -10, AbsoluteMaximum = 10, Title = "Y", IsZoomEnabled = false
+            Position = AxisPosition.Left, Maximum = 10, Minimum = 0, MinimumRange = -10, MaximumRange = 10,
+            Title = "Y"
         };
-        public Dictionary<double, double> Points = new Dictionary<double, double>();
         public ScatterSeries User_Points = new ScatterSeries
         {
             MarkerType = MarkerType.Circle,
@@ -64,29 +73,42 @@ namespace Interpolator
         public int AxisMaximum = 10;
         public int AxisMinimum = 0;
 
-        private void addPoint_Click(object sender, RoutedEventArgs e)
+        private void CreatePointInStack(double x, double y)
         {
-            double x = double.Parse(x_input.Text);
-            double y = double.Parse(y_input.Text);
-            this.Points.Add(x, y);
             PointContainer Point = new PointContainer(x, y);
+            ScatterPoint point = new ScatterPoint(x, y);
+            this.User_Points.Points.Add(point);
             this.user_points_gui.Add(Point);
-            PointsContainer.Children.Add(Point.Container);
+            //PointsContainer.Children.Add(Point.Container);
             Point.button.Click += (object send, RoutedEventArgs ev) =>
             {
-                this.Points.Remove(x);
+                this.User_Points.Points.Remove(point);
                 this.user_points_gui.Remove(Point);
                 PointsContainer.Children.Remove(Point.Container);
             };
         }
 
+        private void RefreshPlot()
+        {
+            this.Model.Series.Clear();
+            this.Model.Series.Add(this.User_Points);
+            this.Model.InvalidatePlot(true);
+        }
+
+        private void addPoint_Click(object sender, RoutedEventArgs e)
+        {
+            double x = double.Parse(x_input.Text);
+            double y = double.Parse(y_input.Text);
+            this.CreatePointInStack(x, y);
+        }
+
         private double LagrangeInterpolator(double x)
         {
             double z = 0, p1, p2;
-            for (var j = 0; j < this.Points.Count; j++)
+            for (var j = 0; j < this.User_Points.Points.Count; j++)
             {
                 p1 = 1; p2 = 1;
-                for (var i = 0; i < this.Points.Count; i++)
+                for (var i = 0; i < this.User_Points.Points.Count; i++)
                 {
                     if(i == j)
                     {
@@ -94,33 +116,46 @@ namespace Interpolator
                     }
                     else
                     {
-                        p1 *= x - this.Points.Keys.ElementAt(i);
-                        p2 *= this.Points.Keys.ElementAt(j) - this.Points.Keys.ElementAt(i);
+                        p1 *= x - this.User_Points.Points[i].X;
+                        p2 *= this.User_Points.Points[j].X - this.User_Points.Points[i].X;
                     }
                 }
-                z += this.Points.Values.ElementAt(j) * p1 / p2;
+                z += this.User_Points.Points[j].Y * p1 / p2;
             }
             return z;
+        }
+        
+        private bool AreClose(ScatterPoint p1, ScatterPoint p2)
+        {
+            double x_diff = p1.X - p2.X;
+            double y_diff = p2.Y - p2.Y;
+            return (Math.Abs(x_diff) < 0.1 && Math.Abs(y_diff) < 0.1) ? true : false;
         }
 
         private void PlotLeftClick(object sender, OxyMouseDownEventArgs e)
         {
-            CursorPoint.Content = String.Format("{0}, {1}", e.Position.X.ToString(), e.Position.Y.ToString());
             if (e.ChangedButton == OxyMouseButton.Left)
             {
-                foreach (ScatterPoint point in this.User_Points.Points)
-                {
-                    if (point.X == e.Position.X && point.Y == e.Position.Y)
-                    {
-                        return;
-                    }
-                }
-                DataPoint temp_point = Axis.InverseTransform(new ScreenPoint(e.Position.X, e.Position.Y), this.Xaxis, this.Yaxis);
+                DataPoint temp_point = Axis.InverseTransform(e.Position, this.Xaxis, this.Yaxis);
                 ScatterPoint new_point = new ScatterPoint(temp_point.X, temp_point.Y);
                 this.User_Points.Points.Add(new_point);
-                this.Model.Series.Clear();
-                this.Model.Series.Add(this.User_Points);
-                this.Model.InvalidatePlot(true);
+                this.RefreshPlot();
+            }
+        }
+
+        private void PlotRightClick(object sender, OxyMouseDownEventArgs e)
+        {
+            DataPoint temp = Axis.InverseTransform(e.Position, this.Xaxis, this.Yaxis);
+            ScatterPoint selected_point = new ScatterPoint(temp.X, temp.Y);
+            foreach (ScatterPoint point in this.User_Points.Points)
+            {
+                if (this.AreClose(point, selected_point))
+                {
+                    this.User_Points.Points.Remove(point);
+                    this.RefreshPlot();
+                    this.Model.InvalidatePlot(true);
+                    break;
+                }
             }
         }
 
@@ -129,7 +164,7 @@ namespace Interpolator
             var series = new LineSeries()
             {
                 MarkerType = MarkerType.Circle,
-                MarkerSize = 3,
+                MarkerSize = 1,
                 MarkerStroke = OxyColors.Red
             };
 
@@ -140,7 +175,7 @@ namespace Interpolator
             }
 
             series.Smooth = true;
-            this.Model.Series.Clear();
+            this.RefreshPlot();
             this.Model.Series.Add(series);
             this.Model.InvalidatePlot(true);
             plot.Model = this.Model;

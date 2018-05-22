@@ -7,7 +7,11 @@
         <local:MainWindow/>
     </Window.DataContext>
     <Grid Margin="0,0,0,-21">
-        <oxy:PlotView Model="{Binding Model}" Controller="{Binding plotController}" Margin="183,10,10,29" x:Name="plot"/>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="207*"/>
+            <RowDefinition Height="13*"/>
+        </Grid.RowDefinitions>
+        <oxy:PlotView Model="{Binding Model}" Margin="178,10,10,10" x:Name="plot"/>
         <Button Content="Add Point" HorizontalAlignment="Left" Height="21" Margin="15,54,0,0" VerticalAlignment="Top" Width="145" x:Name="addPoint" Click="addPoint_Click"/>
         <TextBox HorizontalAlignment="Left" Height="23" Margin="115,26,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="45" x:Name="y_input"/>
         <Label Content="Y:" HorizontalAlignment="Left" Margin="91,22,0,0" VerticalAlignment="Top" Height="27"/>
