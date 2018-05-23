@@ -22,20 +22,36 @@ namespace Interpolator
     /// </summary>
     public partial class MainWindow : Window
     {
+        public IPlotController plotController;
+        public PlotModel Model { get; set; }
+        public LinearAxis Xaxis = new LinearAxis
+        {
+            Position = AxisPosition.Bottom,
+            Minimum = 0,
+            Maximum = 10,
+            Title = "X"
+        };
+        public LinearAxis Yaxis = new LinearAxis
+        {
+            Position = AxisPosition.Left,
+            Maximum = 10,
+            Minimum = 0,
+            Title = "Y"
+        };
+        public ScatterSeries User_Points = new ScatterSeries
+        {
+            MarkerType = MarkerType.Circle,
+            MarkerSize = 5
+        };
+        public List<PointContainer> user_points_gui = new List<PointContainer>();
+        public int AxisMaximum = 10;
+        public int AxisMinimum = 0;
         public MainWindow()
         {
             this.Model = new PlotModel();
             this.Model.Axes.Add(this.Xaxis);
             this.Model.Axes.Add(this.Yaxis);
-            var series = new LineSeries
-            {
-                MarkerType = MarkerType.Circle,
-                MarkerSize = 1,
-                MarkerStroke = OxyColors.White
-            };
-            series.Points.Add(new DataPoint(0, 0));
-            series.Smooth = true;
-            this.Model.Series.Add(series);
+            this.Model.Series.Add(User_Points);
             this.Model.MouseDown += (s, e) =>
             {
                 if (e.ChangedButton == OxyMouseButton.Left)
@@ -52,34 +68,12 @@ namespace Interpolator
             };
         }
 
-        public IPlotController plotController;
-        public PlotModel Model { get; set; }
-        public LinearAxis Xaxis = new LinearAxis
-        {
-            Position = AxisPosition.Bottom, Minimum = 0, Maximum = 10, MaximumRange = 10, IsPanEnabled = false,
-            MinimumRange = -10, Title = "X"
-        };
-        public LinearAxis Yaxis = new LinearAxis
-        {
-            Position = AxisPosition.Left, Maximum = 10, Minimum = 0, MinimumRange = -10, MaximumRange = 10,
-            Title = "Y"
-        };
-        public ScatterSeries User_Points = new ScatterSeries
-        {
-            MarkerType = MarkerType.Circle,
-            MarkerSize = 5
-        };
-        public List<PointContainer> user_points_gui = new List<PointContainer>();
-        public int AxisMaximum = 10;
-        public int AxisMinimum = 0;
-
         private void CreatePointInStack(double x, double y)
         {
             PointContainer Point = new PointContainer(x, y);
             ScatterPoint point = new ScatterPoint(x, y);
             this.User_Points.Points.Add(point);
             this.user_points_gui.Add(Point);
-            //PointsContainer.Children.Add(Point.Container);
             Point.button.Click += (object send, RoutedEventArgs ev) =>
             {
                 this.User_Points.Points.Remove(point);
@@ -134,13 +128,15 @@ namespace Interpolator
 
         private void PlotLeftClick(object sender, OxyMouseDownEventArgs e)
         {
+            ScatterSeries user_points = this.User_Points;
             if (e.ChangedButton == OxyMouseButton.Left)
             {
                 DataPoint temp_point = Axis.InverseTransform(e.Position, this.Xaxis, this.Yaxis);
                 ScatterPoint new_point = new ScatterPoint(temp_point.X, temp_point.Y);
-                this.User_Points.Points.Add(new_point);
+                user_points.Points.Add(new_point);
                 this.RefreshPlot();
             }
+            Console.WriteLine(this.User_Points.Points.Count);
         }
 
         private void PlotRightClick(object sender, OxyMouseDownEventArgs e)
