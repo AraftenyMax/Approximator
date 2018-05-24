@@ -29,7 +29,7 @@ namespace Interpolator
             MarkerType = MarkerType.Circle,
             MarkerSize = 0.5
         };
-        public static LineSeries PolynomSeries = new LineSeries
+        public static FunctionSeries PolynomSeries = new FunctionSeries
         {
             MarkerType = MarkerType.Circle,
             MarkerSize = 5
@@ -154,7 +154,7 @@ namespace Interpolator
             {
                 for (j = i; j >= 1; j--)
                 {
-                    if (User_Points[i].X < User_Points[j - 1].X)
+                    if (User_Points[j].X < User_Points[j - 1].X)
                     {
                         DataPoint temp = User_Points[j - 1];
                         User_Points[j - 1] = User_Points[j];
@@ -212,12 +212,13 @@ namespace Interpolator
             return function;
         }
 
-        private FunctionSeries PolynomInterpolator()
+        private void PolynomInterpolator()
         {
             double[] ratios = this.CalculateCoefficients();
             Func<double, double> function = this.getEquation(ratios);
             FunctionSeries functionSeries = new FunctionSeries(function, this.AxisMinimum, this.AxisMaximum, this.Step);
-            return functionSeries;
+            foreach(DataPoint Point in functionSeries.Points)
+                PointsContainer.PolynomSeries.Points.Add(Point);
         }
 
         private void CalculateLagrangeSeries()
@@ -230,9 +231,16 @@ namespace Interpolator
             }
         }
 
+        private void CalculatePolynomSeries()
+        {
+            PointsContainer.PolynomSeries.Points.Clear();
+            this.PolynomInterpolator();
+        }
+
         public void BuildPlot()
         {
             this.CalculateLagrangeSeries();
+            this.CalculatePolynomSeries();
         }
     }
 }
