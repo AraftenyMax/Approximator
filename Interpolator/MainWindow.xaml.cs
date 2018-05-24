@@ -43,15 +43,15 @@ namespace Interpolator
             MarkerType = MarkerType.Circle,
             MarkerSize = 5
         };
-        public List<PointContainer> user_points_gui = new List<PointContainer>();
         public int AxisMaximum = 10;
         public int AxisMinimum = 0;
+        public double Step = 0.1;
         public MainWindow()
         {
             this.Model = new PlotModel();
             this.Model.Axes.Add(this.Xaxis);
             this.Model.Axes.Add(this.Yaxis);
-            this.Model.Series.Add(User_Points);
+            this.Model.Series.Add(this.User_Points);
             this.Model.MouseDown += (s, e) =>
             {
                 if (e.ChangedButton == OxyMouseButton.Left)
@@ -64,21 +64,7 @@ namespace Interpolator
                 if(e.ChangedButton == OxyMouseButton.Right)
                 {
                     this.PlotRightClick(s, e);
-    }
-            };
-        }
-
-        private void CreatePointInStack(double x, double y)
-        {
-            PointContainer Point = new PointContainer(x, y);
-            ScatterPoint point = new ScatterPoint(x, y);
-            this.User_Points.Points.Add(point);
-            this.user_points_gui.Add(Point);
-            Point.button.Click += (object send, RoutedEventArgs ev) =>
-            {
-                this.User_Points.Points.Remove(point);
-                this.user_points_gui.Remove(Point);
-                PointsContainer.Children.Remove(Point.Container);
+                }
             };
         }
 
@@ -87,13 +73,6 @@ namespace Interpolator
             this.Model.Series.Clear();
             this.Model.Series.Add(this.User_Points);
             this.Model.InvalidatePlot(true);
-        }
-
-        private void addPoint_Click(object sender, RoutedEventArgs e)
-        {
-            double x = double.Parse(x_input.Text);
-            double y = double.Parse(y_input.Text);
-            this.CreatePointInStack(x, y);
         }
 
         private double LagrangeInterpolator(double x)
@@ -128,15 +107,11 @@ namespace Interpolator
 
         private void PlotLeftClick(object sender, OxyMouseDownEventArgs e)
         {
-            ScatterSeries user_points = this.User_Points;
-            if (e.ChangedButton == OxyMouseButton.Left)
-            {
-                DataPoint temp_point = Axis.InverseTransform(e.Position, this.Xaxis, this.Yaxis);
-                ScatterPoint new_point = new ScatterPoint(temp_point.X, temp_point.Y);
-                user_points.Points.Add(new_point);
-                this.RefreshPlot();
-            }
-            Console.WriteLine(this.User_Points.Points.Count);
+            DataPoint temp_point = Axis.InverseTransform(e.Position, this.Xaxis, this.Yaxis);
+            ScatterPoint new_point = new ScatterPoint(temp_point.X, temp_point.Y);
+            this.User_Points.Points.Add(new_point);
+            //this.RefreshPlot();
+            this.Model.InvalidatePlot(true);
         }
 
         private void PlotRightClick(object sender, OxyMouseDownEventArgs e)
@@ -155,27 +130,113 @@ namespace Interpolator
             }
         }
 
+        private double[] CalculateCoefficients()
+        {
+            int i, j, k, K = 3;
+            double s, t, M;
+            var User_Points = this.User_Points.Points;
+            var length = int.Parse(User_Points.Count.ToString());
+            double[,] sums = new double[length, length];
+            double[] b = new double[length];
+            double[] a = new double[4];
+            //Сортируем точки по координатам X
+            for(i = 0; i < this.User_Points.Points.Count; i++)
+            {
+                for(j = i; j >= 1; j--)
+                {
+                    if(this.User_Points.Points[i].X < this.User_Points.Points[j-1].X)
+                    {
+                        ScatterPoint temp = User_Points[j - 1];
+                        User_Points[j - 1] = User_Points[j];
+                        User_Points[j] = temp;
+                    }
+                }
+            }
+            //Заполняем коэффициенты системы уравнений
+            for(i = 0; i < K + 1; i++)
+            {
+                for(j = 0; j < K + 1; j++)
+                {
+                    sums[i,j] = 0;
+                    for(k = 0; k < length; k++)
+                    {
+                        sums[i, j] += Math.Pow(User_Points[k].X, i + j);
+                    }
+                }
+            }
+            //Заполняем столбец свободных членов
+            for(i = 0; i < K + 1; i++)
+            {
+                b[i] = 0;
+                for(k = 0; k < length; k++)
+                {
+                    b[i] += Math.Pow(User_Points[i].X, i) * User_Points[i].Y;
+                }
+            }
+            //Применяем метод Гаусса для приведения матрицы системы к треугольному виду
+            for(k = 0; k<K+1; k++)
+            {
+                for(i = k+1; i < K + 1; i++)
+                {
+                    M = sums[i, k] / sums[k, k];
+                    for(j = k; j < K + 1; j++)
+                    {
+                        sums[i, j] -= M * sums[k, j];
+                    }
+                    b[i] -= M * b[k];
+                }
+            }
+            for(i = K; i >= 0; i--)
+            {
+                s = 0;
+                for (j = i; j < K + 1; j++)
+                    s += sums[i, j] * a[j];
+                a[i] = (b[i] - s) / sums[i, i];
+            }
+            return a;
+        }
+
+        private Func<double, double> getEquation(double [] ratios)
+        {
+            Func<double, double> function = (x) => ratios[0] * Math.Pow(x, 3) + ratios[1] * Math.Pow(x, 2) + ratios[2] * x + ratios[3];
+            return function;
+        }
+
+        private FunctionSeries PolynomInterpolator()
+        {
+            double[] ratios = this.CalculateCoefficients();
+            Func<double, double> function = this.getEquation(ratios);
+            FunctionSeries functionSeries = new FunctionSeries(function, this.AxisMinimum, this.AxisMaximum, this.Step);
+            return functionSeries;
+        }
+
         private void Button_Click(object sender, RoutedEventArgs e)
         {
-            var series = new LineSeries()
+            if (this.Model.Series.Count == 0)
+                return;
+            var LagrangeSeries = new LineSeries()
             {
                 MarkerType = MarkerType.Circle,
                 MarkerSize = 1,
                 MarkerStroke = OxyColors.Red
             };
 
-            for(double i = this.AxisMinimum; i < this.AxisMaximum; i += 0.5)
+            for(double i = this.AxisMinimum; i < this.AxisMaximum; i += this.Step)
             {
                 var point = new DataPoint(i, this.LagrangeInterpolator(i));
-                series.Points.Add(point);
+                LagrangeSeries.Points.Add(point);
             }
-
-            series.Smooth = true;
+            var PolynomSeries = this.PolynomInterpolator();
+            LagrangeSeries.Smooth = true;
             this.RefreshPlot();
-            this.Model.Series.Add(series);
+            this.Model.Series.Add(PolynomSeries);
+            this.Model.Series.Add(LagrangeSeries);
             this.Model.InvalidatePlot(true);
-            plot.Model = this.Model;
-            plot.InvalidatePlot(true);
+        }
+
+        private void Button_Click_1(object sender, RoutedEventArgs e)
+        {
+            Console.WriteLine(this.User_Points.Points.Count);
         }
     }
 }

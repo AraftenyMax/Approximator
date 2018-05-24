@@ -11,14 +11,8 @@
             <RowDefinition Height="207*"/>
             <RowDefinition Height="13*"/>
         </Grid.RowDefinitions>
-        <oxy:PlotView Model="{Binding Model}" Margin="178,10,10,10" x:Name="plot"/>
-        <Button Content="Add Point" HorizontalAlignment="Left" Height="21" Margin="15,54,0,0" VerticalAlignment="Top" Width="145" x:Name="addPoint" Click="addPoint_Click"/>
-        <TextBox HorizontalAlignment="Left" Height="23" Margin="115,26,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="45" x:Name="y_input"/>
-        <Label Content="Y:" HorizontalAlignment="Left" Margin="91,22,0,0" VerticalAlignment="Top" Height="27"/>
-        <Label Content="X:" HorizontalAlignment="Left" Margin="15,23,0,0" VerticalAlignment="Top"/>
-        <TextBox HorizontalAlignment="Left" Height="23" Margin="45,26,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="41" x:Name="x_input"/>
-        <StackPanel HorizontalAlignment="Left" Height="303" Margin="15,80,0,0" VerticalAlignment="Top" Width="163" x:Name="PointsContainer"/>
-        <Button Content="Draw" HorizontalAlignment="Left" Margin="15,391,0,0" VerticalAlignment="Top" Width="71" Click="Button_Click"/>
-        <Label Content="Label" HorizontalAlignment="Left" Margin="115,388,0,0" VerticalAlignment="Top" x:Name="CursorPoint"/>
+        <oxy:PlotView Model="{Binding Model}" Margin="10,10,10,56" x:Name="plot"/>
+        <Button Content="Draw" HorizontalAlignment="Left" Margin="408,363,0,0" VerticalAlignment="Top" Width="71" Click="Button_Click"/>
+        <Button Content="Show" Click="Button_Click_1" Width="71"/>
     </Grid>
 </Window>
