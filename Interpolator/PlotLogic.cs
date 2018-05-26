@@ -18,6 +18,7 @@ namespace Interpolator
     {
         public static ScatterSeries SelectedPoints = new ScatterSeries
         {
+            Title = "User Points",
             MarkerType = MarkerType.Circle,
             MarkerSize = 5
         };
@@ -28,11 +29,13 @@ namespace Interpolator
         };
         public static LineSeries LagrangeSeries = new LineSeries
         {
+            Title = "Lagrange Series",
             MarkerType = MarkerType.Circle,
             MarkerSize = 0.5
         };
         public static FunctionSeries PolynomSeries = new FunctionSeries
         {
+            Title = "Polynom Series",
             MarkerType = MarkerType.Circle,
             MarkerSize = 0.5
         };
@@ -86,6 +89,8 @@ namespace Interpolator
             {
                 Model.Axes.Add(Xaxis);
                 Model.Axes.Add(Yaxis);
+                Model.LegendTitle = "Legend";
+                Model.LegendPosition = LegendPosition.BottomRight;
                 Model.Series.Add(PointsContainer.SelectedPoints);
                 Model.Series.Add(PointsContainer.LagrangeSeries);
                 Model.Series.Add(PointsContainer.PolynomSeries);
