@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using OxyPlot;
 using OxyPlot.Axes;
 using MathNet.Numerics.Interpolation;
+using MathNet.Numerics;
 using OxyPlot.Series;
 
 namespace Interpolator
@@ -143,68 +144,19 @@ namespace Interpolator
 
         private void CalculateCoefficients()
         {
-            int k;
-            int j = 1;
-            int quantity = PointsContainer.PlotPoints.Points.Count+1;
+            int quantity = PointsContainer.PlotPoints.Points.Count;
             double[] x = new double[quantity];
             double[] y = new double[quantity];
-            double[] h = new double[quantity];
-            double[] l = new double[quantity];
-            double[] delta = new double[quantity];
-            double[] lambda = new double[quantity];
-            double[] c = new double[quantity];
-            double[] d = new double[quantity];
-            double[] b = new double[quantity];
-            foreach (DataPoint p in PointsContainer.PlotPoints.Points)
+            int counter = 0;
+            foreach(DataPoint Point in PointsContainer.PlotPoints.Points)
             {
-                x[j] = p.X;
-                y[j] = p.Y;
-                j++;
+                x[counter] = Point.X;
+                y[counter] = Point.Y;
+                counter++;
             }
-
-            for(k = 1; k <= quantity-1; k++)
-            {
-                h[k] = x[k] - x[k - 1];
-                l[k] = (y[k] - y[k - 1]) / h[k];
-            }
-
-            delta[1] = -h[2] / (2 * (h[1] + h[2]));
-            lambda[1] = 1.5 * (l[2] - l[1]) / (h[1] + h[2]);
-            for(k = 3; k <= quantity-1; k++)
-            {
-                delta[k - 1] = -h[k] / (2 * h[k - 1] + 2 * h[k] + h[k - 1] * delta[k - 2]);
-                lambda[k - 1] = (3 * l[k] - 3 * l[k - 1] - h[k - 1] * delta[k - 2]) /
-                               (2 * h[k - 1] + 2 * h[k] + h[k - 1] * delta[k - 2]);
-            }
-            c[0] = 0;
-            c[quantity-1] = 0;
-            for(k = quantity-1; k >= 2; k--)
-            {
-                c[k - 1] = delta[k - 1] * c[k] + lambda[k - 1];
-            }
-            for(k = 1; k <= quantity-1; k++)
-            {
-                d[k] = (c[k] - c[k - 1]) / (3 * h[k]);
-                b[k] = l[k] + (2 * c[k] * h[k] + h[k] * c[k - 1]) / 3;
-            }
-            this.ApplyRatios(y, b, c, d, x, y);
-        }
-
-        private FunctionSeries getSplinePart(double a, double b, double c, double d, double from, double to)
-        {
-            Func<double, double> function = (x) => a + x * b + Math.Pow(x, 2) * c + Math.Pow(x, 3) * d;
-            FunctionSeries Series = new FunctionSeries(function, from, to, this.Step);
-            return Series;
-        }
-
-        private void ApplyRatios(double[] a, double[] b, double[] c, double[] d, double[] x, double[] y)
-        {
-            for(int i = 1; i < a.Length; i++)
-            {
-                FunctionSeries Series = this.getSplinePart(a[i], b[i], c[i], d[i], x[i-1], x[i]);
-                foreach (DataPoint Point in Series.Points)
-                    PointsContainer.PolynomSeries.Points.Add(Point);
-            }
+            IInterpolation cubicSpline = Interpolate.CubicSpline(x, y);
+            for (double i = this.AxisMinimum; i < this.AxisMaximum; i += this.Step)
+                PointsContainer.PolynomSeries.Points.Add(new DataPoint(i, cubicSpline.Interpolate(i)));
         }
 
         private void CalculateLagrangeSeries()
