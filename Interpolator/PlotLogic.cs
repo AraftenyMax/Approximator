@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using OxyPlot;
 using OxyPlot.Axes;
+using MathNet.Numerics.Interpolation;
 using OxyPlot.Series;
 
 namespace Interpolator
@@ -32,7 +33,7 @@ namespace Interpolator
         public static FunctionSeries PolynomSeries = new FunctionSeries
         {
             MarkerType = MarkerType.Circle,
-            MarkerSize = 5
+            MarkerSize = 0.5
         };
     }
 
@@ -140,85 +141,70 @@ namespace Interpolator
             return z;
         }
 
-        private double[] CalculateCoefficients()
+        private void CalculateCoefficients()
         {
-            int i, j, k, K = 3;
-            double s, t, M;
-            var User_Points = PointsContainer.PlotPoints.Points;
-            var length = int.Parse(User_Points.Count.ToString());
-            double[,] sums = new double[length, length];
-            double[] b = new double[length];
-            double[] a = new double[4];
-            //Сортируем точки по координатам X
-            for (i = 0; i < User_Points.Count; i++)
+            int k;
+            int j = 1;
+            int quantity = PointsContainer.PlotPoints.Points.Count+1;
+            double[] x = new double[quantity];
+            double[] y = new double[quantity];
+            double[] h = new double[quantity];
+            double[] l = new double[quantity];
+            double[] delta = new double[quantity];
+            double[] lambda = new double[quantity];
+            double[] c = new double[quantity];
+            double[] d = new double[quantity];
+            double[] b = new double[quantity];
+            foreach (DataPoint p in PointsContainer.PlotPoints.Points)
             {
-                for (j = i; j >= 1; j--)
-                {
-                    if (User_Points[j].X < User_Points[j - 1].X)
-                    {
-                        DataPoint temp = User_Points[j - 1];
-                        User_Points[j - 1] = User_Points[j];
-                        User_Points[j] = temp;
-                    }
-                }
+                x[j] = p.X;
+                y[j] = p.Y;
+                j++;
             }
-            //Заполняем коэффициенты системы уравнений
-            for (i = 0; i < K + 1; i++)
+
+            for(k = 1; k <= quantity-1; k++)
             {
-                for (j = 0; j < K + 1; j++)
-                {
-                    sums[i, j] = 0;
-                    for (k = 0; k < length; k++)
-                    {
-                        sums[i, j] += Math.Pow(User_Points[k].X, i + j);
-                    }
-                }
+                h[k] = x[k] - x[k - 1];
+                l[k] = (y[k] - y[k - 1]) / h[k];
             }
-            //Заполняем столбец свободных членов
-            for (i = 0; i < K + 1; i++)
+
+            delta[1] = -h[2] / (2 * (h[1] + h[2]));
+            lambda[1] = 1.5 * (l[2] - l[1]) / (h[1] + h[2]);
+            for(k = 3; k <= quantity-1; k++)
             {
-                b[i] = 0;
-                for (k = 0; k < length; k++)
-                {
-                    b[i] += Math.Pow(User_Points[i].X, i) * User_Points[i].Y;
-                }
+                delta[k - 1] = -h[k] / (2 * h[k - 1] + 2 * h[k] + h[k - 1] * delta[k - 2]);
+                lambda[k - 1] = (3 * l[k] - 3 * l[k - 1] - h[k - 1] * delta[k - 2]) /
+                               (2 * h[k - 1] + 2 * h[k] + h[k - 1] * delta[k - 2]);
             }
-            //Применяем метод Гаусса для приведения матрицы системы к треугольному виду
-            for (k = 0; k < K + 1; k++)
+            c[0] = 0;
+            c[quantity-1] = 0;
+            for(k = quantity-1; k >= 2; k--)
             {
-                for (i = k + 1; i < K + 1; i++)
-                {
-                    M = sums[i, k] / sums[k, k];
-                    for (j = k; j < K + 1; j++)
-                    {
-                        sums[i, j] -= M * sums[k, j];
-                    }
-                    b[i] -= M * b[k];
-                }
+                c[k - 1] = delta[k - 1] * c[k] + lambda[k - 1];
             }
-            for (i = K; i >= 0; i--)
+            for(k = 1; k <= quantity-1; k++)
             {
-                s = 0;
-                for (j = i; j < K + 1; j++)
-                    s += sums[i, j] * a[j];
-                a[i] = (b[i] - s) / sums[i, i];
+                d[k] = (c[k] - c[k - 1]) / (3 * h[k]);
+                b[k] = l[k] + (2 * c[k] * h[k] + h[k] * c[k - 1]) / 3;
             }
-            return a;
+            this.ApplyRatios(y, b, c, d, x, y);
         }
 
-        private Func<double, double> getEquation(double[] ratios)
+        private FunctionSeries getSplinePart(double a, double b, double c, double d, double from, double to)
         {
-            Func<double, double> function = (x) => ratios[0] * Math.Pow(x, 3) + ratios[1] * Math.Pow(x, 2) + ratios[2] * x + ratios[3];
-            return function;
+            Func<double, double> function = (x) => a + x * b + Math.Pow(x, 2) * c + Math.Pow(x, 3) * d;
+            FunctionSeries Series = new FunctionSeries(function, from, to, this.Step);
+            return Series;
         }
 
-        private void PolynomInterpolator()
+        private void ApplyRatios(double[] a, double[] b, double[] c, double[] d, double[] x, double[] y)
         {
-            double[] ratios = this.CalculateCoefficients();
-            Func<double, double> function = this.getEquation(ratios);
-            FunctionSeries functionSeries = new FunctionSeries(function, this.AxisMinimum, this.AxisMaximum, this.Step);
-            foreach(DataPoint Point in functionSeries.Points)
-                PointsContainer.PolynomSeries.Points.Add(Point);
+            for(int i = 1; i < a.Length; i++)
+            {
+                FunctionSeries Series = this.getSplinePart(a[i], b[i], c[i], d[i], x[i-1], x[i]);
+                foreach (DataPoint Point in Series.Points)
+                    PointsContainer.PolynomSeries.Points.Add(Point);
+            }
         }
 
         private void CalculateLagrangeSeries()
@@ -234,7 +220,7 @@ namespace Interpolator
         private void CalculatePolynomSeries()
         {
             PointsContainer.PolynomSeries.Points.Clear();
-            this.PolynomInterpolator();
+            this.CalculateCoefficients();
         }
 
         public void BuildPlot()
